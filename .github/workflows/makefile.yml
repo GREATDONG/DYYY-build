@@ -1,27 +1,40 @@
-name: Makefile CI
+name: Build DYYY Plugin
 
 on:
   push:
-    branches: [ "main" ]
+    branches-ignore:
+      - dev
   pull_request:
-    branches: [ "main" ]
+    branches-ignore:
+      - dev
 
 jobs:
   build:
-
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
 
-    - name: configure
-      run: ./configure
+      - name: Prepare Theos
+        uses: huami1314/theos-action@main
 
-    - name: Install dependencies
-      run: make
+      - name: Setup GNU Make
+        run: |
+          echo "$(brew --prefix)/opt/make/libexec/gnubin" >> $GITHUB_PATH
 
-    - name: Run check
-      run: make check
+      - name: Build package
+        run: |
+          rm -f packages/*
+          make package FINALPACKAGE=1 -j$(sysctl -n hw.ncpu)
+          make package THEOS_PACKAGE_SCHEME=rootless FINALPACKAGE=1 -j$(sysctl -n hw.ncpu)
+          make package THEOS_PACKAGE_SCHEME=roothide FINALPACKAGE=1 -j$(sysctl -n hw.ncpu)
 
-    - name: Run distcheck
-      run: make distcheck
+      - name: Upload Deb packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: DYYY
+          path: packages/*.deb
